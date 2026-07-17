@@ -142,7 +142,11 @@ function formatShowingDate(raw){
   const parts=raw.split("-").map(Number);
   if(parts.length!==3) return "";
   const d=new Date(parts[0],parts[1]-1,parts[2]);
-  return new Intl.DateTimeFormat("en-US",{weekday:"long"}).format(d);
+  return new Intl.DateTimeFormat("en-US",{
+    weekday:"long",
+    month:"long",
+    day:"numeric"
+  }).format(d);
 }
 
 function formatShowingTime(raw){

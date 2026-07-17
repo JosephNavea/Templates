@@ -23,7 +23,7 @@ h1{font-size:clamp(1.7rem,5vw,2.4rem);margin:0}
 .field label{display:block;font-size:.88rem;font-weight:700;margin-bottom:5px}
 .field input,.field select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--input);color:var(--text);font-size:1rem}
 .field small{display:block;color:var(--muted);margin-top:5px;line-height:1.3}
-.panel-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.panel-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}
 .secondary{border:1px solid var(--border);background:transparent;color:var(--text);padding:10px 12px}
 .primary{border:0;background:var(--accent);color:#fff;padding:10px 12px}
 .controls{display:flex;gap:10px;margin:18px 0}
@@ -54,7 +54,7 @@ h1{font-size:clamp(1.7rem,5vw,2.4rem);margin:0}
     <h1>Leasing Templates</h1>
     <button id="themeToggle" class="icon-btn">🌙</button>
   </div>
-  <p class="subtitle">Enter the details once, then copy any personalized message.</p>
+  <p class="subtitle">Enter the details once, copy personalized messages, or create a prefilled Google Calendar event.</p>
 
   <section class="details-panel">
     <div class="details-header">
@@ -70,6 +70,21 @@ h1{font-size:clamp(1.7rem,5vw,2.4rem);margin:0}
         <div class="field">
           <label for="propertyAddress">Property address</label>
           <input id="propertyAddress" data-key="ADDRESS" type="text" placeholder="Property address">
+        </div>
+        <div class="field">
+          <label for="clientPhone">Client phone number</label>
+          <input id="clientPhone" data-key="PHONE" type="tel" placeholder="Client phone number">
+        </div>
+        <div class="field">
+          <label for="referenceCode">Reference code</label>
+          <input id="referenceCode" data-key="REFERENCE" type="text" placeholder="Example: FB039">
+        </div>
+        <div class="field">
+          <label for="showingMethod">Showing method</label>
+          <select id="showingMethod" data-key="METHOD">
+            <option value="in-person">In person</option>
+            <option value="virtual">Virtual</option>
+          </select>
         </div>
         <div class="field">
           <label for="showingDate">Showing date</label>
@@ -89,7 +104,8 @@ h1{font-size:clamp(1.7rem,5vw,2.4rem);margin:0}
       </div>
       <div class="panel-actions">
         <button id="clearDetails" class="secondary">Clear</button>
-        <button id="saveDetails" class="primary">Save details</button>
+        <button id="saveDetails" class="secondary">Save details</button>
+        <button id="googleCalendarButton" class="primary">Add to Google Calendar</button>
       </div>
     </div>
   </section>
@@ -195,6 +211,69 @@ async function copyText(text,el){
   setTimeout(()=>el.textContent="",1600);
 }
 
+
+function getCalendarEventData(){
+  const raw=rawValues();
+  const address=(raw.ADDRESS||"").trim();
+  const name=(raw.NAME||"").trim();
+  const phone=(raw.PHONE||"").trim();
+  const reference=(raw.REFERENCE||"").trim().replace(/^REF\.?\s*/i,"");
+  const method=raw.METHOD||"in-person";
+  const date=raw.SHOWING_DATE||"";
+  const time=raw.SHOWING_TIME||"";
+
+  if(!address || !date || !time){
+    alert("Please enter the property address, showing date, and showing time first.");
+    return null;
+  }
+
+  const titlePrefix=method==="virtual" ? "Virtual Apartment Showing" : "Apartment Showing";
+  const title=`${titlePrefix} | ${address}`;
+
+  const start=new Date(`${date}T${time}:00`);
+  if(Number.isNaN(start.getTime())){
+    alert("Please select a valid showing date and time.");
+    return null;
+  }
+
+  const end=new Date(start.getTime()+30*60*1000);
+
+  const pad=n=>String(n).padStart(2,"0");
+  const formatLocal=d =>
+    `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+
+  const description=[
+    title,
+    "",
+    name ? `Client: ${name}` : "",
+    phone ? `Phone: ${phone}` : "",
+    reference ? `REF. ${reference}` : ""
+  ].filter((line,index,array)=>line!=="" || (index===1 && array[0])).join("\n").trim();
+
+  return {
+    title,
+    dates:`${formatLocal(start)}/${formatLocal(end)}`,
+    details:description,
+    location:address
+  };
+}
+
+function openGoogleCalendar(){
+  const event=getCalendarEventData();
+  if(!event) return;
+
+  const params=new URLSearchParams({
+    action:"TEMPLATE",
+    text:event.title,
+    dates:event.dates,
+    details:event.details,
+    location:event.location,
+    ctz:"America/Chicago"
+  });
+
+  window.open(`https://calendar.google.com/calendar/render?${params.toString()}`,"_blank");
+}
+
 function render(){
   const q=searchInput.value.toLowerCase().trim();
   app.innerHTML="";
@@ -241,6 +320,7 @@ function render(){
 
 inputs.forEach(i=>i.addEventListener("input",render));
 document.getElementById("saveDetails").onclick=()=>{localStorage.setItem("leasingDetails",JSON.stringify(rawValues()));render()};
+document.getElementById("googleCalendarButton").onclick=openGoogleCalendar;
 document.getElementById("clearDetails").onclick=()=>{inputs.forEach(i=>i.value="");localStorage.removeItem("leasingDetails");render()};
 document.getElementById("toggleDetails").onclick=()=>{
   const body=document.getElementById("detailsBody");
